@@ -8,12 +8,12 @@ version = "0.1.0"
 description = "Scan codebases for quantum-vulnerable cryptography and generate a NIST-aligned migration plan."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "Proprietary" }
+license = { text = "MIT" }
 authors = [{ name = "QuantumSafe" }]
 keywords = ["quantum", "cryptography", "pqc", "nist", "security", "kyber", "dilithium"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: MIT License",
     "Topic :: Security :: Cryptography",
 ]
 dependencies = [

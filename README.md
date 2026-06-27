@@ -22,6 +22,30 @@ It ships as three parts that share **one** detection engine:
 
 ---
 
+## What this project demonstrates
+
+QuantumSafe is a full, working product built end to end — not a tutorial clone.
+It was built to show breadth and depth across the stack:
+
+- **Program analysis:** a real detection engine using Python's `ast` module
+  (import + call resolution) alongside a multi-language regex engine, with
+  per-line/per-family de-duplication so findings don't double-count.
+- **Applied cryptography knowledge:** maps each finding to *why* it's quantum-
+  vulnerable (Shor's vs. Grover's algorithm) and to the correct NIST PQC
+  replacement (FIPS 203/204/205).
+- **Backend engineering:** a Flask REST API with SQLAlchemy, JWT + bcrypt auth,
+  hashed API keys, rate limiting, CORS lockdown, and Stripe subscription billing.
+- **Frontend engineering:** a dependency-light dashboard (vanilla JS) with a
+  consistent data contract against the API, charts, and exports.
+- **Software engineering practice:** one shared detection package powering both
+  the CLI and the API, an automated end-to-end test (`backend/smoke_test.py`),
+  and deploy configs for a real multi-service deployment.
+
+See [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) for the design decisions, the
+quantum-threat background, and an honest list of limitations.
+
+---
+
 ## Table of contents
 
 1. [What it detects](#what-it-detects)
@@ -309,4 +333,4 @@ Quantamn-Safe/
 
 ## License
 
-Proprietary — all rights reserved. See [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
