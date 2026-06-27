@@ -82,6 +82,168 @@
   function initLanding() {
     // Pre-warm the API to hide cold starts on hosted backends.
     fetch(API_BASE + "/health").catch(() => {});
+
+    // Copy-to-clipboard on the install snippet.
+    const copyBtn = $("#copy-install");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText("pip install quantumsafe");
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
+        } catch (_) { /* clipboard may be blocked */ }
+      });
+    }
+
+    initDemoScanner();
+    initReveal();
+  }
+
+  // ---- In-browser live scanner (client-side, nothing leaves the browser) ----
+  const DEMO_SAMPLE =
+    "import hashlib\n" +
+    "from cryptography.hazmat.primitives.asymmetric import rsa, ec\n\n" +
+    "# vulnerable key generation\n" +
+    "key = rsa.generate_private_key(public_exponent=65537, key_size=2048)\n" +
+    "ec_key = ec.generate_private_key(ec.SECP256R1())\n\n" +
+    "def fingerprint(data):\n" +
+    "    return hashlib.md5(data).hexdigest()   # weak hash\n\n" +
+    "digest = hashlib.sha256(data).hexdigest()\n" +
+    "ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)   # deprecated TLS\n";
+
+  const DEMO_RULES = [
+    { re: /\brsa\b|generatekeypair(?:sync)?\(\s*['"]rsa|rsa\.generate/i, family: "rsa", algo: "RSA", risk: "HIGH", rec: "CRYSTALS-Kyber / Dilithium (FIPS 203/204)" },
+    { re: /\becdsa\b|\becdh\b|\becc\b|elliptic|secp256|prime256v1|crypto\/ecdsa/i, family: "ecc", algo: "ECC / ECDSA", risk: "HIGH", rec: "Kyber / Dilithium" },
+    { re: /\bdsa\b/i, family: "dsa", algo: "DSA", risk: "HIGH", rec: "Dilithium (FIPS 204)" },
+    { re: /diffie[\s-]?hellman|\bdh\b/i, family: "dh", algo: "Diffie-Hellman", risk: "HIGH", rec: "Kyber (FIPS 203)" },
+    { re: /\bmd5\b/i, family: "md5", algo: "MD5", risk: "HIGH", rec: "SHA-3 / SHA-256" },
+    { re: /\bsha-?1\b/i, family: "sha1", algo: "SHA-1", risk: "HIGH", rec: "SHA-3 / SHA-256" },
+    { re: /tlsv1(?:\.0|\.1)?(?![\d.])|protocol_tlsv1\b|sslv3/i, family: "tls_old", algo: "TLS 1.0/1.1", risk: "MEDIUM", rec: "TLS 1.3" },
+    { re: /3des|triple[\s_-]?des|desede/i, family: "3des", algo: "3DES", risk: "MEDIUM", rec: "AES-256" },
+    { re: /\brc4\b/i, family: "rc4", algo: "RC4", risk: "MEDIUM", rec: "AES-256-GCM" },
+    { re: /\bsha-?256\b/i, family: "sha256", algo: "SHA-256", risk: "LOW", rec: "OK; SHA-384/512 long-term" },
+    { re: /\baes-?128\b/i, family: "aes128", algo: "AES-128", risk: "LOW", rec: "AES-256" },
+    { re: /tlsv1\.2\b/i, family: "tls12", algo: "TLS 1.2", risk: "LOW", rec: "TLS 1.3" },
+  ];
+  const DEMO_POINTS = { HIGH: 15, MEDIUM: 5, LOW: 1 };
+  const DEMO_RANK = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+
+  function scanDemo(text) {
+    const lines = text.split("\n");
+    const best = {}; // key: line|family -> finding
+    lines.forEach((line, i) => {
+      if (!line.trim()) return;
+      DEMO_RULES.forEach((r) => {
+        if (r.re.test(line)) {
+          const key = i + "|" + r.family;
+          if (!best[key] || DEMO_RANK[r.risk] > DEMO_RANK[best[key].risk]) {
+            best[key] = { line: i + 1, algo: r.algo, risk: r.risk, rec: r.rec, family: r.family };
+          }
+        }
+      });
+    });
+    const findings = Object.values(best).sort(
+      (a, b) => DEMO_RANK[b.risk] - DEMO_RANK[a.risk] || a.line - b.line);
+    const counts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+    let score = 0;
+    findings.forEach((f) => { counts[f.risk]++; score += DEMO_POINTS[f.risk]; });
+    return { findings, counts, score: Math.min(100, score) };
+  }
+
+  function demoBand(score) {
+    if (score === 0) return ["No risk detected", "var(--accent)"];
+    if (score <= 30) return ["Low risk", "var(--accent)"];
+    if (score <= 60) return ["Medium risk", "var(--warning)"];
+    if (score <= 80) return ["High risk", "var(--danger)"];
+    return ["Critical risk", "var(--danger)"];
+  }
+
+  let demoAnim = null;
+  function animateScore(to) {
+    const el = $("#demo-score");
+    if (!el) return;
+    const from = parseInt(el.textContent, 10) || 0;
+    const start = performance.now();
+    if (demoAnim) cancelAnimationFrame(demoAnim);
+    function step(now) {
+      const t = Math.min(1, (now - start) / 450);
+      el.textContent = Math.round(from + (to - from) * t);
+      if (t < 1) demoAnim = requestAnimationFrame(step);
+    }
+    demoAnim = requestAnimationFrame(step);
+  }
+
+  function renderDemo() {
+    const input = $("#demo-input");
+    if (!input) return;
+    const { findings, counts, score } = scanDemo(input.value);
+    const [bandText, color] = demoBand(score);
+
+    animateScore(score);
+    const scoreEl = $("#demo-score");
+    if (scoreEl) scoreEl.style.color = color;
+    const bandEl = $("#demo-band");
+    if (bandEl) { bandEl.textContent = bandText; bandEl.style.color = color; }
+    const bar = $("#demo-bar");
+    if (bar) { bar.style.width = score + "%"; bar.style.background = color; }
+    $("#demo-high").textContent = counts.HIGH;
+    $("#demo-med").textContent = counts.MEDIUM;
+    $("#demo-low").textContent = counts.LOW;
+
+    const box = $("#demo-findings");
+    if (!box) return;
+    if (!input.value.trim()) {
+      box.innerHTML = `<div class="muted" style="padding:14px;">Paste code to see findings.</div>`;
+      return;
+    }
+    box.innerHTML = findings.length
+      ? findings.map((f) => `
+        <div class="demo-finding ${riskClass(f.risk)}">
+          <span class="badge ${riskClass(f.risk)}">${f.risk}</span>
+          <span class="mono">line ${f.line}</span>
+          <b>${esc(f.algo)}</b>
+          <span class="arrow">→</span>
+          <span class="muted">${esc(f.rec)}</span>
+        </div>`).join("")
+      : `<div class="low" style="padding:14px;">No quantum-vulnerable cryptography detected. 🎉</div>`;
+  }
+
+  function initDemoScanner() {
+    const input = $("#demo-input");
+    if (!input) return;
+    input.value = DEMO_SAMPLE;
+    input.addEventListener("input", renderDemo);
+    const sample = $("#demo-sample");
+    if (sample) sample.addEventListener("click", () => { input.value = DEMO_SAMPLE; renderDemo(); });
+    renderDemo();
+  }
+
+  // ---- Scroll reveal ----
+  function initReveal() {
+    const els = $$(".pillar, .plan, .demo-grid, .trust");
+    els.forEach((el) => el.classList.add("reveal"));
+    if (!("IntersectionObserver" in window)) {
+      els.forEach((el) => el.classList.add("visible"));
+      return;
+    }
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("visible"); obs.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    els.forEach((el) => obs.observe(el));
+  }
+
+  // ---- Cookie / storage notice (all pages) ----
+  function ensureCookieNotice() {
+    if (localStorage.getItem("qs_cookie_ack") === "1") return;
+    const bar = document.createElement("div");
+    bar.className = "cookie-banner";
+    bar.innerHTML =
+      'We use strictly-necessary local storage to keep you signed in. ' +
+      'See our <a href="privacy.html">Privacy Policy</a>. ' +
+      '<button class="btn btn-sm btn-primary" id="cookie-ok">Got it</button>';
+    document.body.appendChild(bar);
+    const ok = bar.querySelector("#cookie-ok");
+    ok.addEventListener("click", () => { localStorage.setItem("qs_cookie_ack", "1"); bar.remove(); });
   }
 
   // =========================================================================
@@ -124,6 +286,11 @@
 
     forms.register && forms.register.addEventListener("submit", async (e) => {
       e.preventDefault();
+      const consent = document.getElementById("reg-consent");
+      if (consent && !consent.checked) {
+        showMsg(msg, "Please agree to the Terms and Privacy Policy to continue.");
+        return;
+      }
       try {
         const d = await api("/api/v1/auth/register", {
           noAuth: true, noRedirect: true,
@@ -492,5 +659,7 @@
     else if (page === "dashboard.html") initDashboard();
     else if (page === "scan.html") initScanDetail();
     else if (page === "migration.html") initMigration();
+    // privacy.html / terms.html need no page init.
+    ensureCookieNotice();
   });
 })();

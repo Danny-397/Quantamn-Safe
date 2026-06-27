@@ -28,8 +28,39 @@
         <a href="#install" class="btn btn-primary">Install Free CLI</a>
         <a href="login.html?mode=register" class="btn">Sign Up for Dashboard</a>
       </div>
-      <div class="code" id="install"><span class="prompt">$</span> pip install quantumsafe
+      <div class="code-wrap">
+        <button class="copy-btn" id="copy-install" title="Copy">Copy</button>
+        <div class="code" id="install"><span class="prompt">$</span> pip install quantumsafe
 <span class="prompt">$</span> quantumsafe scan --path ./myproject</div>
+      </div>
+    </section>
+
+    <!-- Interactive in-browser scanner -->
+    <section class="section wrap" id="try">
+      <h2>Try it in your browser</h2>
+      <p class="lead">Paste code below — QuantumSafe scans it live, right here. No signup, nothing leaves your browser.</p>
+      <div class="demo-grid">
+        <div class="demo-left">
+          <div class="demo-toolbar">
+            <span class="muted mono">paste code (Python, JS, Java, Go, Ruby)</span>
+            <button class="btn btn-sm" id="demo-sample">Load sample</button>
+          </div>
+          <textarea id="demo-input" class="demo-input mono" spellcheck="false"></textarea>
+        </div>
+        <div class="demo-right">
+          <div class="demo-score-card">
+            <div class="demo-score mono" id="demo-score">0</div>
+            <div class="demo-band" id="demo-band">No code scanned</div>
+            <div class="demo-bar"><div class="demo-bar-fill" id="demo-bar"></div></div>
+            <div class="pill-row" style="justify-content:center;margin-top:12px;">
+              <span class="high">HIGH <b id="demo-high">0</b></span>
+              <span class="medium">MED <b id="demo-med">0</b></span>
+              <span class="low">LOW <b id="demo-low">0</b></span>
+            </div>
+          </div>
+          <div class="demo-findings" id="demo-findings"></div>
+        </div>
+      </div>
     </section>
 
     <section class="section wrap" id="features">
@@ -103,6 +134,11 @@
   </main>
 
   <footer class="footer">
+    <div class="footer-links">
+      <a href="#features">Features</a> · <a href="#pricing">Pricing</a> ·
+      <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> ·
+      <a href="https://github.com/Danny-397/Quantamn-Safe">GitHub</a>
+    </div>
     QuantumSafe — a security tool for awareness, not a substitute for a professional cryptographic audit.
   </footer>
 
