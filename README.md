@@ -251,8 +251,10 @@ quantumsafe scan --path . --fail-on-high
 # Try it on the bundled examples
 quantumsafe scan --path examples
 
-# Link the CLI to your paid dashboard account (key from Settings page)
-quantumsafe auth --key qs_live_xxxxxxxx
+# Link the CLI to your dashboard, then scans auto-upload to your history
+quantumsafe auth --key qs_live_xxxxxxxx --api-url https://quantumsafe-api.onrender.com
+quantumsafe scan --path ./myproject            # prints results AND syncs to dashboard
+quantumsafe scan --path ./myproject --no-sync  # local only, don't upload
 
 # Version
 quantumsafe version
@@ -265,6 +267,11 @@ quantumsafe version
 | `--output` | Write to `.json`, `.cbom.json` (CycloneDX CBOM), `.html`, `.sarif`, or `.svg` (risk badge); terminal summary still printed |
 | `--exclude` | Glob of paths to skip (repeatable) |
 | `--fail-on-high` | Exit non-zero on any HIGH finding (CI gate) |
+| `--no-sync` | Don't upload the result to your linked dashboard |
+
+After `quantumsafe auth --key <key> --api-url <your-api>`, every `quantumsafe scan`
+also uploads its report to your dashboard (`POST /api/v1/scan/import`), so terminal
+scans appear in your web history. Use `--no-sync` to keep a scan local.
 
 **Suppressing a finding:** add `# quantumsafe: ignore` (any comment style) to the
 line. Useful for a known-safe, non-security use of an algorithm.
@@ -318,6 +325,12 @@ curl -s http://localhost:5000/api/v1/auth/register \
 POST /api/v1/scan               (JWT or X-API-Key)
      { "repo_url": "https://github.com/org/app" }   # or multipart file=<.zip>
      -> { scan_id, report }
+
+POST /api/v1/scan/import        (X-API-Key)   # used by the CLI to upload results
+     { "report": { ...quantumsafe report... } } -> { scan_id }
+
+POST /api/v1/demo-scan          (public, rate-limited)  # landing-page live demo
+     { "code": "..." } -> { report }   # runs the real engine, stores nothing
 
 GET  /api/v1/scans?page=1&per_page=20   (JWT)  -> paginated list
 GET  /api/v1/scans/{id}                 (JWT)  -> scan + findings

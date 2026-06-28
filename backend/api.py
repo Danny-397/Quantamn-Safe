@@ -127,6 +127,65 @@ def _maybe_send_alert(user: User, scan, report: dict) -> None:
     )
 
 
+def _sanitize_report(report: dict) -> dict:
+    """Validate + clamp a CLI-supplied report to safe shapes/sizes before storing."""
+    if not isinstance(report, dict):
+        raise ValueError("report must be an object")
+    findings_in = report.get("findings", [])
+    if not isinstance(findings_in, list):
+        raise ValueError("findings must be a list")
+    summary = report.get("summary") or {}
+    findings = []
+    for f in findings_in[:10000]:  # cap to avoid DB bloat / abuse
+        if not isinstance(f, dict):
+            continue
+        findings.append({
+            "file_path": str(f.get("file_path", ""))[:1024],
+            "line_number": int(f.get("line_number", 0) or 0),
+            "algorithm": str(f.get("algorithm", ""))[:64],
+            "risk_level": str(f.get("risk_level", "LOW"))[:10],
+            "recommendation": str(f.get("recommendation", "")),
+            "nist_reference": str(f.get("nist_reference", ""))[:255],
+            "complexity": str(f.get("complexity", ""))[:10],
+            "family": str(f.get("family", ""))[:32],
+            "why": str(f.get("why", "")),
+        })
+    return {
+        "target": str(report.get("target", "CLI scan"))[:1024],
+        "risk_score": max(0, min(100, int(report.get("risk_score", 0) or 0))),
+        "risk_band": str(report.get("risk_band", "Low"))[:20],
+        "summary": {
+            "high": int(summary.get("high", 0) or 0),
+            "medium": int(summary.get("medium", 0) or 0),
+            "low": int(summary.get("low", 0) or 0),
+        },
+        "findings": findings,
+    }
+
+
+@api_bp.route("/scan/import", methods=["POST"])
+@limiter.limit("60 per hour")
+@api_key_or_jwt
+def import_scan():
+    """Receive a report computed by the CLI and store it in the user's history.
+
+    This is how `quantumsafe scan` (after `quantumsafe auth`) gets results into the
+    dashboard: the CLI scans locally, then POSTs the finished report here.
+    """
+    user: User = g.current_user
+    allowed, msg = _enforce_scan_limit(user)
+    if not allowed:
+        return jsonify({"error": msg}), 402
+    data = request.get_json(silent=True) or {}
+    try:
+        report = _sanitize_report(data.get("report", data))
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "Invalid scan report payload."}), 400
+    scan = persist_scan(user.id, report)
+    _maybe_send_alert(user, scan, report)
+    return jsonify({"scan_id": scan.id}), 201
+
+
 @api_bp.route("/scans", methods=["GET"])
 @jwt_required()
 def list_scans():

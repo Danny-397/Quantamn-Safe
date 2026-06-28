@@ -109,8 +109,41 @@ def cmd_scan(args: argparse.Namespace) -> int:
     else:
         reporter.print_terminal(report)
 
+    _maybe_sync(report, args.no_sync)
+
     # Non-zero exit on HIGH findings so the CLI is CI-friendly.
     return 1 if report["summary"]["high"] > 0 and args.fail_on_high else 0
+
+
+def _maybe_sync(report: dict, no_sync: bool) -> None:
+    """Upload the report to the linked dashboard (if `auth` was run with an API URL)."""
+    if no_sync:
+        return
+    cfg = load_config()
+    key, url = cfg.get("api_key"), cfg.get("api_url")
+    if not key or not url:
+        return  # not linked to a dashboard — nothing to do
+
+    import json
+    import urllib.error
+    import urllib.request
+
+    body = json.dumps({"report": report}).encode("utf-8")
+    req = urllib.request.Request(
+        url.rstrip("/") + "/api/v1/scan/import",
+        data=body,
+        headers={"Content-Type": "application/json", "X-API-Key": key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            res = json.load(resp)
+        print(f"Synced to dashboard: scan #{res.get('scan_id')} ({url})")
+    except urllib.error.HTTPError as exc:
+        print(f"Dashboard sync failed (HTTP {exc.code}). Re-run 'quantumsafe auth' "
+              f"to reconnect.", file=sys.stderr)
+    except Exception as exc:
+        print(f"Dashboard sync skipped ({exc}).", file=sys.stderr)
 
 
 # --------------------------------------------------------------------------- #
@@ -145,6 +178,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Glob of paths to skip (repeatable), e.g. --exclude 'tests/*'.")
     p_scan.add_argument("--fail-on-high", action="store_true",
                         help="Exit with code 1 if any HIGH-risk finding is present (for CI).")
+    p_scan.add_argument("--no-sync", action="store_true",
+                        help="Don't upload results to your linked dashboard account.")
     p_scan.set_defaults(func=cmd_scan)
 
     p_version = sub.add_parser("version", help="Print the version.")

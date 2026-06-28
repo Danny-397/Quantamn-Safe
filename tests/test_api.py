@@ -129,6 +129,40 @@ def test_free_plan_scan_limit(auth_client):
     assert r.status_code == 402
 
 
+def test_cli_import_scan_appears_in_dashboard(auth_client):
+    client, headers = auth_client
+    key = client.post("/api/v1/user/apikey", headers=headers).get_json()["api_key"]
+    report = {
+        "target": "./local-project", "risk_score": 45, "risk_band": "Medium",
+        "summary": {"high": 3, "medium": 0, "low": 0},
+        "findings": [{"file_path": "a.py", "line_number": 2, "algorithm": "MD5",
+                      "risk_level": "HIGH", "recommendation": "SHA-3",
+                      "nist_reference": "FIPS 202", "complexity": "Low",
+                      "family": "md5", "why": "broken"}],
+    }
+    r = client.post("/api/v1/scan/import", headers={"X-API-Key": key}, json={"report": report})
+    assert r.status_code == 201
+    sid = r.get_json()["scan_id"]
+    # It now shows up in the user's dashboard history.
+    assert client.get("/api/v1/scans", headers=headers).get_json()["total"] == 1
+    detail = client.get(f"/api/v1/scans/{sid}", headers=headers).get_json()["scan"]
+    assert detail["risk_score"] == 45
+    assert detail["findings"][0]["algorithm"] == "MD5"
+
+
+def test_import_scan_rejects_garbage(auth_client):
+    client, headers = auth_client
+    key = client.post("/api/v1/user/apikey", headers=headers).get_json()["api_key"]
+    r = client.post("/api/v1/scan/import", headers={"X-API-Key": key},
+                    json={"report": {"findings": "not-a-list"}})
+    assert r.status_code == 400
+
+
+def test_import_scan_requires_auth(client):
+    r = client.post("/api/v1/scan/import", json={"report": {"findings": []}})
+    assert r.status_code == 401
+
+
 def test_billing_not_configured(auth_client):
     client, headers = auth_client
     r = client.post("/api/v1/billing/checkout", headers=headers, json={"plan": "pro"})
