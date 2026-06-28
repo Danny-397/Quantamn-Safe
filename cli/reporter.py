@@ -127,6 +127,90 @@ def to_json(report: dict) -> str:
 # --------------------------------------------------------------------------- #
 
 
+_CBOM_PRIMITIVE = {
+    "rsa": "pke", "ecc": "signature", "dsa": "signature", "dh": "key-agree",
+    "md5": "hash", "sha1": "hash", "sha256": "hash",
+    "3des": "block-cipher", "rc4": "stream-cipher", "aes128": "block-cipher",
+    "tls_old": "other", "tls12": "other",
+}
+
+
+def to_cbom(report: dict) -> str:
+    """Render findings as a CycloneDX 1.6 Cryptography Bill of Materials (CBOM).
+
+    Groups detected algorithms into ``cryptographic-asset`` components with the
+    file/line occurrences as evidence. This is the format enterprises are
+    beginning to require for post-quantum readiness reporting.
+    """
+    # Group findings by algorithm so each component lists all its occurrences.
+    groups: dict[str, dict] = {}
+    for f in report["findings"]:
+        g = groups.setdefault(f["algorithm"], {"finding": f, "occ": []})
+        g["occ"].append({"location": f["file_path"], "line": f["line_number"]})
+
+    components = []
+    for i, (algo, g) in enumerate(groups.items()):
+        f = g["finding"]
+        components.append({
+            "type": "cryptographic-asset",
+            "bom-ref": f"crypto-{i}",
+            "name": algo,
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": _CBOM_PRIMITIVE.get(f["family"], "other"),
+                    "nistQuantumSecurityLevel": 0 if f["risk_level"] == RISK_HIGH else 1,
+                },
+            },
+            "evidence": {"occurrences": g["occ"]},
+            "properties": [
+                {"name": "quantumsafe:risk", "value": f["risk_level"]},
+                {"name": "quantumsafe:recommendation", "value": f["recommendation"]},
+                {"name": "quantumsafe:nist", "value": f["nist_reference"]},
+            ],
+        })
+
+    cbom = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "version": 1,
+        "metadata": {
+            "timestamp": report.get("generated_at", ""),
+            "tools": {"components": [{"type": "application", "name": "QuantumSafe",
+                                      "version": report.get("version", "")}]},
+            "component": {"type": "application", "name": report.get("target", "scan")},
+            "properties": [{"name": "quantumsafe:riskScore",
+                            "value": str(report.get("risk_score", 0))}],
+        },
+        "components": components,
+    }
+    return json.dumps(cbom, indent=2)
+
+
+def to_badge_svg(report: dict) -> str:
+    """Render a shields-style SVG badge of the quantum risk score (embeddable)."""
+    score = report["risk_score"]
+    band = report["risk_band"]
+    color = {"Low": "#00FF88", "Medium": "#FFB800", "High": "#FF4444", "Critical": "#FF4444"}.get(band, "#888")
+    label = "quantum risk"
+    value = f"{score}/100 {band}"
+    # Approximate text widths (~6.5px/char + padding).
+    lw = int(len(label) * 6.5) + 12
+    vw = int(len(value) * 6.5) + 14
+    total = lw + vw
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{total}" height="20" role="img" aria-label="{label}: {value}">
+  <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+  <rect width="{total}" height="20" rx="3" fill="#1c1c26"/>
+  <rect x="{lw}" width="{vw}" height="20" rx="3" fill="{color}"/>
+  <rect x="{lw}" width="6" height="20" fill="{color}"/>
+  <rect width="{total}" height="20" rx="3" fill="url(#s)"/>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,sans-serif" font-size="11">
+    <text x="{lw/2}" y="14" fill="#E0E0E0">{label}</text>
+    <text x="{lw + vw/2}" y="14" fill="#0A0A0F" font-weight="bold">{value}</text>
+  </g>
+</svg>'''
+
+
 def to_sarif(report: dict) -> str:
     """Render findings as SARIF 2.1.0 — the format GitHub code scanning ingests.
 

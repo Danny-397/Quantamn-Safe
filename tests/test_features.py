@@ -2,7 +2,7 @@
 
 import json
 
-from quantumsafe.reporter import build_report, to_sarif
+from quantumsafe.reporter import build_report, to_badge_svg, to_cbom, to_sarif
 from quantumsafe.scanner import scan_path
 
 
@@ -28,6 +28,32 @@ def test_sarif_output_is_valid(tmp_path):
     assert result["locations"][0]["physicalLocation"]["region"]["startLine"] >= 1
     # rule carries a security-severity for GitHub code scanning
     assert run["tool"]["driver"]["rules"][0]["properties"]["security-severity"]
+
+
+def test_cbom_output_is_valid(tmp_path):
+    _write(tmp_path, "c.py",
+           "import hashlib\n"
+           "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+           "k = rsa.generate_private_key(public_exponent=65537, key_size=2048)\n"
+           "h = hashlib.md5(b'x')\n")
+    report = build_report(scan_path(str(tmp_path)), str(tmp_path))
+    cbom = json.loads(to_cbom(report))
+    assert cbom["bomFormat"] == "CycloneDX"
+    assert cbom["specVersion"] == "1.6"
+    assert len(cbom["components"]) >= 1
+    comp = cbom["components"][0]
+    assert comp["type"] == "cryptographic-asset"
+    assert comp["evidence"]["occurrences"]
+    assert "cryptoProperties" in comp
+
+
+def test_badge_svg(tmp_path):
+    _write(tmp_path, "c.py", "import hashlib\nh = hashlib.md5(b'x')\n")
+    report = build_report(scan_path(str(tmp_path)), str(tmp_path))
+    svg = to_badge_svg(report)
+    assert svg.startswith("<svg")
+    assert "quantum risk" in svg
+    assert str(report["risk_score"]) in svg
 
 
 def test_inline_suppression(tmp_path):

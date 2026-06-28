@@ -85,15 +85,21 @@ def cmd_scan(args: argparse.Namespace) -> int:
     report = reporter.build_report(findings, target)
 
     if args.output:
-        ext = os.path.splitext(args.output)[1].lower()
-        if ext == ".json":
+        name = args.output.lower()
+        ext = os.path.splitext(name)[1]
+        if name.endswith(".cbom.json") or name.endswith(".cdx.json"):
+            content = reporter.to_cbom(report)
+        elif ext == ".json":
             content = reporter.to_json(report)
         elif ext in (".html", ".htm"):
             content = reporter.to_html(report)
         elif ext == ".sarif":
             content = reporter.to_sarif(report)
+        elif ext == ".svg":
+            content = reporter.to_badge_svg(report)
         else:
-            print("Error: --output must end in .json, .html, or .sarif", file=sys.stderr)
+            print("Error: --output must end in .json, .cbom.json, .html, .sarif, or .svg",
+                  file=sys.stderr)
             return 2
         with open(args.output, "w", encoding="utf-8") as fh:
             fh.write(content)
@@ -132,7 +138,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan = sub.add_parser("scan", help="Scan a local path or GitHub repo.")
     p_scan.add_argument("--path", help="Local directory or file to scan.")
     p_scan.add_argument("--repo", help="Public GitHub repository URL to scan.")
-    p_scan.add_argument("--output", help="Write report to this file (.json, .html, or .sarif).")
+    p_scan.add_argument("--output",
+                        help="Write report to this file: .json, .cbom.json (CycloneDX CBOM), "
+                             ".html, .sarif, or .svg (risk badge).")
     p_scan.add_argument("--exclude", action="append", metavar="GLOB",
                         help="Glob of paths to skip (repeatable), e.g. --exclude 'tests/*'.")
     p_scan.add_argument("--fail-on-high", action="store_true",

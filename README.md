@@ -118,10 +118,12 @@ quantumsafe scan --path ./myproject
 # Scan a public GitHub repo (shallow-cloned to a temp dir, then cleaned up)
 quantumsafe scan --repo https://github.com/org/app
 
-# Write a JSON, standalone HTML, or SARIF report
+# Write a report: JSON, HTML, SARIF, CycloneDX CBOM, or an SVG risk badge
 quantumsafe scan --path ./myproject --output report.json
 quantumsafe scan --path ./myproject --output report.html
-quantumsafe scan --path ./myproject --output report.sarif   # GitHub code scanning
+quantumsafe scan --path ./myproject --output report.sarif       # GitHub code scanning
+quantumsafe scan --path ./myproject --output report.cbom.json   # CycloneDX CBOM
+quantumsafe scan --path ./myproject --output badge.svg          # embeddable risk badge
 
 # Skip paths with glob patterns (repeatable)
 quantumsafe scan --path . --exclude 'tests/*' --exclude 'vendor/*'
@@ -143,7 +145,7 @@ quantumsafe version
 |------|-------------|
 | `--path` | Local directory or file to scan |
 | `--repo` | Public `https://github.com/<org>/<repo>` URL |
-| `--output` | Write to `report.json`, `report.html`, or `report.sarif` (terminal summary still printed) |
+| `--output` | Write to `.json`, `.cbom.json` (CycloneDX CBOM), `.html`, `.sarif`, or `.svg` (risk badge); terminal summary still printed |
 | `--exclude` | Glob of paths to skip (repeatable) |
 | `--fail-on-high` | Exit non-zero on any HIGH finding (CI gate) |
 

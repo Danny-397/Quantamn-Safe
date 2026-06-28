@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <a href="#try" class="skip-link">Skip to the live scanner</a>
   <header class="nav">
     <div class="brand"><span class="dot"></span> QuantumSafe</div>
     <nav class="nav-links">
@@ -56,7 +57,7 @@
             <span class="muted mono">paste code (Python, JS, Java, Go, Ruby)</span>
             <button class="btn btn-sm" id="demo-sample">Load sample</button>
           </div>
-          <textarea id="demo-input" class="demo-input mono" spellcheck="false"></textarea>
+          <textarea id="demo-input" class="demo-input mono" spellcheck="false" aria-label="Paste code to scan for quantum-vulnerable cryptography"></textarea>
         </div>
         <div class="demo-right">
           <div class="demo-score-card">
