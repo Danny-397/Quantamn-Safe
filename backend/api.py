@@ -7,6 +7,9 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import io
+import json
+import os
+import tempfile
 
 from flask import Blueprint, Response, g, jsonify, request
 from flask_jwt_extended import jwt_required
@@ -17,10 +20,30 @@ from config import FREE_MONTHLY_SCAN_LIMIT, PLAN_FREE, PLAN_PRO, PLAN_TEAM
 from extensions import db, limiter
 from models import Finding, Scan, User, generate_api_key
 from quantumsafe.recommender import recommend
-from quantumsafe.reporter import to_badge_svg, to_cbom, to_html, to_sarif
+from quantumsafe.reporter import build_report, to_badge_svg, to_cbom, to_html, to_sarif
+from quantumsafe.scanner import EXT_TO_LANG, scan_path
 from scanner_service import persist_scan, scan_repo_url, scan_upload
 
+DEMO_MAX_BYTES = 50_000
+
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
+
+
+class _Unauthorized(Exception):
+    """Raised when a valid JWT resolves to a missing user (e.g. deleted account)."""
+
+
+@api_bp.errorhandler(_Unauthorized)
+def _handle_unauthorized(_exc):
+    return jsonify({"error": "Authentication required."}), 401
+
+
+def _require_user() -> User:
+    """Return the authenticated user, or raise -> JSON 401 (handles deleted accounts)."""
+    user = current_user()
+    if user is None:
+        raise _Unauthorized()
+    return user
 
 
 # --------------------------------------------------------------------------- #
@@ -107,7 +130,7 @@ def _maybe_send_alert(user: User, scan, report: dict) -> None:
 @api_bp.route("/scans", methods=["GET"])
 @jwt_required()
 def list_scans():
-    user = current_user()
+    user = _require_user()
     page = max(1, request.args.get("page", 1, type=int))
     per_page = min(100, max(1, request.args.get("per_page", 20, type=int)))
 
@@ -128,7 +151,7 @@ def list_scans():
 @api_bp.route("/scans/<int:scan_id>", methods=["GET"])
 @jwt_required()
 def get_scan(scan_id: int):
-    user = current_user()
+    user = _require_user()
     scan = Scan.query.filter_by(id=scan_id, user_id=user.id).first()
     if scan is None:
         return jsonify({"error": "Scan not found."}), 404
@@ -138,7 +161,7 @@ def get_scan(scan_id: int):
 @api_bp.route("/scans/<int:scan_id>/export", methods=["GET"])
 @jwt_required()
 def export_scan(scan_id: int):
-    user = current_user()
+    user = _require_user()
     scan = Scan.query.filter_by(id=scan_id, user_id=user.id).first()
     if scan is None:
         return jsonify({"error": "Scan not found."}), 404
@@ -193,7 +216,7 @@ def export_scan(scan_id: int):
 @api_bp.route("/overview", methods=["GET"])
 @jwt_required()
 def overview():
-    user = current_user()
+    user = _require_user()
     scans = Scan.query.filter_by(user_id=user.id).order_by(Scan.created_at.desc()).all()
 
     totals = db.session.query(
@@ -227,7 +250,7 @@ def overview():
 @api_bp.route("/scans/<int:scan_id>/migration", methods=["GET"])
 @jwt_required()
 def migration_plan(scan_id: int):
-    user = current_user()
+    user = _require_user()
     scan = Scan.query.filter_by(id=scan_id, user_id=user.id).first()
     if scan is None:
         return jsonify({"error": "Scan not found."}), 404
@@ -268,10 +291,64 @@ def migration_plan(scan_id: int):
 # --------------------------------------------------------------------------- #
 
 
+@api_bp.route("/demo-scan", methods=["POST"])
+@limiter.limit("30 per hour")
+def demo_scan():
+    """Public, capped demo: runs the REAL scanner engine on a pasted snippet.
+
+    No auth, nothing stored. This is the same engine behind the CLI/dashboard,
+    limited to a single snippet so the landing-page demo is genuine, not a mock.
+    """
+    data = request.get_json(silent=True) or {}
+    code = data.get("code") or ""
+    if not isinstance(code, str) or not code.strip():
+        return jsonify({"error": "Provide a 'code' string to scan."}), 400
+    if len(code.encode("utf-8")) > DEMO_MAX_BYTES:
+        return jsonify({"error": "Snippet too large for the demo (50 KB max). "
+                                 "Use the CLI or sign up to scan whole repos."}), 413
+
+    fname = os.path.basename(data.get("filename") or "snippet.py")  # no traversal
+    if os.path.splitext(fname)[1].lower() not in EXT_TO_LANG:
+        fname = "snippet.py"
+    with tempfile.TemporaryDirectory() as tmp:
+        with open(os.path.join(tmp, fname), "w", encoding="utf-8") as fh:
+            fh.write(code)
+        findings = scan_path(tmp)
+    return jsonify({"report": build_report(findings, "in-browser snippet")})
+
+
+@api_bp.route("/user/data", methods=["GET"])
+@jwt_required()
+def export_user_data():
+    """GDPR/CCPA right to access: download everything we hold about the user."""
+    user = _require_user()
+    scans = [s.to_dict(include_findings=True)
+             for s in Scan.query.filter_by(user_id=user.id).all()]
+    payload = {
+        "account": user.to_dict(),
+        "scans": scans,
+        "exported_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+    }
+    return Response(
+        json.dumps(payload, indent=2), mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=quantumsafe_my_data.json"},
+    )
+
+
+@api_bp.route("/user/account", methods=["DELETE"])
+@jwt_required()
+def delete_account():
+    """GDPR/CCPA right to erasure: permanently delete the account + all data."""
+    user = _require_user()
+    db.session.delete(user)  # cascades to scans + findings
+    db.session.commit()
+    return jsonify({"message": "Your account and all associated data have been permanently deleted."})
+
+
 @api_bp.route("/user/preferences", methods=["PUT"])
 @jwt_required()
 def update_preferences():
-    user = current_user()
+    user = _require_user()
     data = request.get_json(silent=True) or {}
     if "alert_on_high" in data:
         user.alert_on_high = bool(data["alert_on_high"])
@@ -282,7 +359,7 @@ def update_preferences():
 @api_bp.route("/user/apikey", methods=["GET"])
 @jwt_required()
 def get_apikey():
-    user = current_user()
+    user = _require_user()
     return jsonify({
         "has_api_key": user.api_key_hash is not None,
         "api_key_prefix": user.api_key_prefix,
@@ -293,7 +370,7 @@ def get_apikey():
 @api_bp.route("/user/apikey", methods=["POST"])
 @jwt_required()
 def regenerate_apikey():
-    user = current_user()
+    user = _require_user()
     full, key_hash, prefix = generate_api_key()
     user.api_key_hash = key_hash
     user.api_key_prefix = prefix

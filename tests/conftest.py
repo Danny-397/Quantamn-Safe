@@ -39,6 +39,7 @@ def auth_client(client):
     """A test client already registered + authenticated, returning (client, headers)."""
     import uuid
     email = f"user-{uuid.uuid4().hex[:8]}@test.com"
-    resp = client.post("/api/v1/auth/register", json={"email": email, "password": "password123"})
+    resp = client.post("/api/v1/auth/register",
+                       json={"email": email, "password": "password123", "accept_terms": True})
     token = resp.get_json()["token"]
     return client, {"Authorization": f"Bearer {token}"}

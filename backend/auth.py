@@ -7,6 +7,7 @@ and the decorators used to protect API routes.
 
 from __future__ import annotations
 
+import datetime as dt
 import functools
 import secrets
 
@@ -117,11 +118,14 @@ def register():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
+    accept_terms = bool(data.get("accept_terms"))
 
     if not _valid_email(email):
         return jsonify({"error": "A valid email is required."}), 400
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters."}), 400
+    if not accept_terms:
+        return jsonify({"error": "You must accept the Terms of Service and Privacy Policy."}), 400
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "An account with that email already exists."}), 409
 
@@ -129,6 +133,7 @@ def register():
         email=email,
         password_hash=hash_password(password),
         verification_token=secrets.token_urlsafe(24),
+        terms_accepted_at=dt.datetime.now(dt.timezone.utc),
     )
     db.session.add(user)
     db.session.commit()

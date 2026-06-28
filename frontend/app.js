@@ -50,6 +50,7 @@
     if (opts.json !== undefined) {
       headers["Content-Type"] = "application/json";
       opts.body = JSON.stringify(opts.json);
+      if (!opts.method) opts.method = "POST";  // a JSON body implies POST
     }
     const res = await fetch(API_BASE + path, { ...opts, headers });
     if (res.status === 401 && !opts.noRedirect) {
@@ -173,12 +174,8 @@
     demoAnim = requestAnimationFrame(step);
   }
 
-  function renderDemo() {
-    const input = $("#demo-input");
-    if (!input) return;
-    const { findings, counts, score } = scanDemo(input.value);
+  function paintDemo(findings, counts, score, emptyMsg) {
     const [bandText, color] = demoBand(score);
-
     animateScore(score);
     const scoreEl = $("#demo-score");
     if (scoreEl) scoreEl.style.color = color;
@@ -192,8 +189,8 @@
 
     const box = $("#demo-findings");
     if (!box) return;
-    if (!input.value.trim()) {
-      box.innerHTML = `<div class="muted" style="padding:14px;">Paste code to see findings.</div>`;
+    if (emptyMsg) {
+      box.innerHTML = `<div class="muted" style="padding:14px;">${emptyMsg}</div>`;
       return;
     }
     box.innerHTML = findings.length
@@ -208,6 +205,42 @@
       : `<div class="low" style="padding:14px;">No quantum-vulnerable cryptography detected. 🎉</div>`;
   }
 
+  // Instant, client-side preview (runs in the browser).
+  function renderDemo() {
+    const input = $("#demo-input");
+    if (!input) return;
+    if (!input.value.trim()) { paintDemo([], { HIGH: 0, MEDIUM: 0, LOW: 0 }, 0, "Paste code to see findings."); return; }
+    const { findings, counts, score } = scanDemo(input.value);
+    paintDemo(findings, counts, score);
+  }
+
+  // The REAL engine: posts the snippet to the backend scanner (with fallback).
+  async function runRealDemo() {
+    const input = $("#demo-input");
+    if (!input || !input.value.trim()) return;
+    const btn = $("#demo-run");
+    const engine = $("#demo-engine");
+    if (btn) { btn.disabled = true; btn.textContent = "Scanning…"; }
+    if (engine) engine.textContent = "Scanning with the QuantumSafe engine…";
+    try {
+      const d = await api("/api/v1/demo-scan", {
+        noAuth: true, noRedirect: true,
+        json: { code: input.value, filename: "snippet.py" },
+      });
+      const r = d.report;
+      const findings = r.findings.map((f) => ({
+        line: f.line_number, algo: f.algorithm, risk: f.risk_level, rec: f.recommendation,
+      }));
+      paintDemo(findings, { HIGH: r.summary.high, MEDIUM: r.summary.medium, LOW: r.summary.low }, r.risk_score);
+      if (engine) engine.textContent = "✓ Scanned by the real QuantumSafe engine (11 languages, AST + regex).";
+    } catch (err) {
+      renderDemo();
+      if (engine) engine.textContent = "Full engine unavailable right now — showing the in-browser preview.";
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "Run full engine →"; }
+    }
+  }
+
   function initDemoScanner() {
     const input = $("#demo-input");
     if (!input) return;
@@ -215,6 +248,8 @@
     input.addEventListener("input", renderDemo);
     const sample = $("#demo-sample");
     if (sample) sample.addEventListener("click", () => { input.value = DEMO_SAMPLE; renderDemo(); });
+    const run = $("#demo-run");
+    if (run) run.addEventListener("click", runRealDemo);
     renderDemo();
   }
 
@@ -294,7 +329,11 @@
       try {
         const d = await api("/api/v1/auth/register", {
           noAuth: true, noRedirect: true,
-          json: { email: forms.register.email.value, password: forms.register.password.value },
+          json: {
+            email: forms.register.email.value,
+            password: forms.register.password.value,
+            accept_terms: true,  // user checked the consent box above (enforced)
+          },
         });
         setToken(d.token);
         const plan = params.get("plan");
@@ -375,6 +414,39 @@
           await api("/api/v1/user/preferences", {
             method: "PUT", json: { alert_on_high: prefBox.checked },
           });
+        } catch (err) { showMsg($("#global-msg"), err.message); }
+      });
+    }
+
+    // GDPR/CCPA: export my data
+    const exportBtn = $("#btn-export-data");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", async () => {
+        try {
+          const res = await fetch(API_BASE + "/api/v1/user/data", {
+            headers: { Authorization: "Bearer " + getToken() },
+          });
+          if (!res.ok) throw new Error("Export failed");
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = "quantumsafe_my_data.json";
+          document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(url);
+        } catch (err) { showMsg($("#global-msg"), err.message); }
+      });
+    }
+
+    // GDPR/CCPA: delete my account (with confirmation)
+    const deleteBtn = $("#btn-delete-account");
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", async () => {
+        if (!confirm("Permanently delete your account and ALL your scans? This cannot be undone.")) return;
+        try {
+          await api("/api/v1/user/account", { method: "DELETE", noRedirect: true });
+          clearToken();
+          alert("Your account and all data have been deleted.");
+          location.href = "index.html";
         } catch (err) { showMsg($("#global-msg"), err.message); }
       });
     }

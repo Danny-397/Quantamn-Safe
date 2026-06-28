@@ -54,10 +54,14 @@
       <div class="demo-grid">
         <div class="demo-left">
           <div class="demo-toolbar">
-            <span class="muted mono">paste code (Python, JS, Java, Go, Ruby)</span>
-            <button class="btn btn-sm" id="demo-sample">Load sample</button>
+            <span class="muted mono">paste code · 11 languages</span>
+            <span>
+              <button class="btn btn-sm" id="demo-sample">Load sample</button>
+              <button class="btn btn-sm btn-primary" id="demo-run">Run full engine →</button>
+            </span>
           </div>
           <textarea id="demo-input" class="demo-input mono" spellcheck="false" aria-label="Paste code to scan for quantum-vulnerable cryptography"></textarea>
+          <div id="demo-engine" class="muted mono" style="margin-top:8px;font-size:12px;">Live preview runs in your browser. Click “Run full engine” for the real QuantumSafe scanner.</div>
         </div>
         <div class="demo-right">
           <div class="demo-score-card">
@@ -71,6 +75,10 @@
             </div>
           </div>
           <div class="demo-findings" id="demo-findings"></div>
+          <p class="muted demo-upsell">
+            This scans one snippet. Sign up to scan <b>whole repos &amp; GitHub</b>,
+            with scan history, reports, and alerts. <a href="login.html">Sign up free →</a>
+          </p>
         </div>
       </div>
     </section>

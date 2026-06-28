@@ -47,14 +47,14 @@ def main() -> int:
         ok = ok and cond
 
     print("register")
-    r = client.post("/api/v1/auth/register", json={"email": "a@b.com", "password": "password123"})
+    r = client.post("/api/v1/auth/register", json={"email": "a@b.com", "password": "password123", "accept_terms": True})
     check("status 201", r.status_code == 201)
     token = r.get_json()["token"]
     check("got JWT", bool(token))
     auth = {"Authorization": f"Bearer {token}"}
 
     print("duplicate register rejected")
-    r = client.post("/api/v1/auth/register", json={"email": "a@b.com", "password": "password123"})
+    r = client.post("/api/v1/auth/register", json={"email": "a@b.com", "password": "password123", "accept_terms": True})
     check("status 409", r.status_code == 409)
 
     print("login")

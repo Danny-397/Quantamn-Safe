@@ -21,24 +21,34 @@ def make_zip():
 # ---- auth ----------------------------------------------------------------- #
 
 def test_register_returns_token(client):
-    r = client.post("/api/v1/auth/register", json={"email": "a@b.com", "password": "password123"})
+    r = client.post("/api/v1/auth/register",
+                    json={"email": "a@b.com", "password": "password123", "accept_terms": True})
     assert r.status_code == 201
     assert r.get_json()["token"]
+    assert r.get_json()["user"]["terms_accepted_at"]  # consent recorded
 
 
 def test_register_rejects_short_password(client):
-    r = client.post("/api/v1/auth/register", json={"email": "a@b.com", "password": "short"})
+    r = client.post("/api/v1/auth/register",
+                    json={"email": "a@b.com", "password": "short", "accept_terms": True})
+    assert r.status_code == 400
+
+
+def test_register_requires_consent(client):
+    r = client.post("/api/v1/auth/register",
+                    json={"email": "noconsent@b.com", "password": "password123"})
     assert r.status_code == 400
 
 
 def test_register_rejects_duplicate(client):
-    client.post("/api/v1/auth/register", json={"email": "dup@b.com", "password": "password123"})
-    r = client.post("/api/v1/auth/register", json={"email": "dup@b.com", "password": "password123"})
-    assert r.status_code == 409
+    j = {"email": "dup@b.com", "password": "password123", "accept_terms": True}
+    client.post("/api/v1/auth/register", json=j)
+    assert client.post("/api/v1/auth/register", json=j).status_code == 409
 
 
 def test_login_and_bad_login(client):
-    client.post("/api/v1/auth/register", json={"email": "l@b.com", "password": "password123"})
+    client.post("/api/v1/auth/register",
+                json={"email": "l@b.com", "password": "password123", "accept_terms": True})
     assert client.post("/api/v1/auth/login", json={"email": "l@b.com", "password": "password123"}).status_code == 200
     assert client.post("/api/v1/auth/login", json={"email": "l@b.com", "password": "nope"}).status_code == 401
 
@@ -123,3 +133,35 @@ def test_billing_not_configured(auth_client):
     client, headers = auth_client
     r = client.post("/api/v1/billing/checkout", headers=headers, json={"plan": "pro"})
     assert r.status_code == 503  # no Stripe keys in test env
+
+
+def test_demo_scan_runs_real_engine(client):
+    r = client.post("/api/v1/demo-scan",
+                    json={"code": "import hashlib\nh = hashlib.md5(b'x')\n", "filename": "x.py"})
+    assert r.status_code == 200
+    report = r.get_json()["report"]
+    assert report["summary"]["high"] >= 1  # real engine flagged MD5
+    assert any(f["algorithm"] == "MD5" for f in report["findings"])
+
+
+def test_demo_scan_rejects_empty_and_huge(client):
+    assert client.post("/api/v1/demo-scan", json={"code": "  "}).status_code == 400
+    assert client.post("/api/v1/demo-scan", json={"code": "x" * 60000}).status_code == 413
+
+
+def test_export_user_data(auth_client):
+    client, headers = auth_client
+    r = client.get("/api/v1/user/data", headers=headers)
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "account" in data and "scans" in data
+
+
+def test_delete_account_removes_data(auth_client):
+    client, headers = auth_client
+    # create a scan, then delete the account
+    client.post("/api/v1/scan", headers=headers,
+                data={"file": (make_zip(), "code.zip")}, content_type="multipart/form-data")
+    assert client.delete("/api/v1/user/account", headers=headers).status_code == 200
+    # token now resolves to a deleted user -> unauthorized
+    assert client.get("/api/v1/overview", headers=headers).status_code == 401

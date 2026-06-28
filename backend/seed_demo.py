@@ -77,6 +77,7 @@ def seed() -> None:
             email_verified=True,
             api_key_hash=key_hash,
             api_key_prefix=prefix,
+            terms_accepted_at=dt.datetime.now(dt.timezone.utc),
         )
         db.session.add(user)
         db.session.commit()

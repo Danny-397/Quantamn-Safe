@@ -79,6 +79,9 @@ class User(db.Model):
     # Email me when a scan finds HIGH-risk vulnerabilities (Pro+ feature).
     alert_on_high = db.Column(db.Boolean, nullable=False, default=True)
 
+    # Record of consent to Terms + Privacy at signup (legal proof of agreement).
+    terms_accepted_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_utcnow)
 
     scans = db.relationship("Scan", backref="user", lazy=True, cascade="all, delete-orphan")
@@ -92,6 +95,7 @@ class User(db.Model):
             "api_key_prefix": self.api_key_prefix,
             "has_api_key": self.api_key_hash is not None,
             "alert_on_high": self.alert_on_high,
+            "terms_accepted_at": self.terms_accepted_at.isoformat() if self.terms_accepted_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
