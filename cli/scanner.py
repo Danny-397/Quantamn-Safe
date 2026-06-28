@@ -270,11 +270,28 @@ def _dotted_name(node: ast.AST) -> str:
 # --------------------------------------------------------------------------- #
 
 
+# Line-comment markers per language, used to skip comment-only lines (a major
+# source of false positives — a `# TODO: drop MD5` line shouldn't be flagged).
+_LINE_COMMENT = {
+    "python": ("#",), "ruby": ("#",),
+    "javascript": ("//", "/*", "*"), "java": ("//", "/*", "*"),
+    "go": ("//", "/*", "*"), "c": ("//", "/*", "*"), "cpp": ("//", "/*", "*"),
+    "csharp": ("//", "/*", "*"), "rust": ("//", "/*", "*"),
+    "kotlin": ("//", "/*", "*"), "swift": ("//", "/*", "*"),
+    "php": ("#", "//", "/*", "*"),
+}
+
+
+def _is_comment_line(line: str, lang: str) -> bool:
+    s = line.lstrip()
+    return bool(s) and s.startswith(_LINE_COMMENT.get(lang, ()))
+
+
 def _regex_scan(lines: list[str], lang: str, rel_path: str) -> list[Finding]:
     findings: list[Finding] = []
     for i, raw in enumerate(lines, start=1):
         line = raw.rstrip("\n")
-        if not line.strip():
+        if not line.strip() or _is_comment_line(line, lang):
             continue
         for rule in RULES:
             if rule.languages and lang not in rule.languages:

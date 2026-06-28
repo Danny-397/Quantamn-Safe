@@ -1,0 +1,14 @@
+{
+  "positive/keys.py": ["rsa", "ecc", "md5", "sha256"],
+  "positive/legacy.java": ["sha1", "3des", "rc4"],
+  "positive/net.js": ["rsa", "tls_old", "aes128"],
+  "positive/server.go": ["dsa", "ecc", "dh"],
+  "positive/api.cs": ["rsa", "md5"],
+  "positive/hash.php": ["rsa", "md5", "sha256"],
+  "positive/mac.swift": ["md5", "sha256"],
+  "positive/sign.rs": ["rsa", "sha1"],
+  "positive/digest.rb": ["rsa", "md5"],
+  "negative/safe.py": [],
+  "negative/comments.js": [],
+  "negative/decoys.go": []
+}

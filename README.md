@@ -52,9 +52,12 @@ It was built to show breadth and depth across the stack:
   hashed API keys, rate limiting, CORS lockdown, and Stripe subscription billing.
 - **Frontend engineering:** a dependency-light dashboard (vanilla JS) with a
   consistent data contract against the API, charts, and exports.
+- **Measured, not asserted:** a labeled [benchmark](benchmark/) (with comment and
+  word-boundary decoys) reports the detector's **precision/recall**, and the
+  result is enforced by the test suite.
 - **Software engineering practice:** one shared detection package powering both
-  the CLI and the API, an automated end-to-end test (`backend/smoke_test.py`),
-  and deploy configs for a real multi-service deployment.
+  the CLI and the API, 55 automated tests, CI, and deploy configs for a real
+  multi-service deployment.
 
 See [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) for the design decisions, the
 quantum-threat background, and an honest list of limitations.
@@ -111,6 +114,28 @@ score = min(100, 15*HIGH + 5*MEDIUM + 1*LOW)
 | 81–100 | Critical | Immediate action required |
 
 ---
+
+## Evaluation (does the detector actually work?)
+
+The scanner is measured against a labeled [benchmark](benchmark/) of 12 files
+across 9 languages, including decoys (crypto names in comments, word-boundary
+traps like `md5sumLabel`) designed to trip a naive matcher:
+
+```bash
+python benchmark/evaluate.py
+```
+
+| Metric | Value |
+|--------|-------|
+| Labeled findings | 24 |
+| Precision | 100% |
+| Recall | 100% |
+
+`evaluate.py` prints the exact false positives/negatives so the numbers are
+auditable, and the thresholds are enforced by `tests/test_benchmark.py`. Honest
+limits (inline comments, string literals, regex-only for non-Python) are
+documented in [benchmark/README.md](benchmark/README.md) — this is a regression
+benchmark, not a claim of perfection on arbitrary code.
 
 ## Quantum demonstrations (Shor & Grover)
 

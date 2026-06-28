@@ -122,6 +122,21 @@ Shor end-to-end today. It is not a claim to factor RSA-2048 — that needs
 fault-tolerant hardware that does not exist. The point is to demonstrate the real
 mechanism, which is exactly what makes the migration case credible.
 
+## 2c. Evaluation
+
+The detector is measured, not assumed. `benchmark/` is a labeled corpus (12 files,
+9 languages, 24 ground-truth findings at (file, family) granularity) including
+adversarial decoys: crypto names that appear only in comments, and word-boundary
+traps (`md5sumLabel`, `rc4legacyName`, `dsaCount`). `benchmark/evaluate.py`
+computes precision/recall/F1 and prints the exact FPs/FNs; `tests/test_benchmark.py`
+enforces thresholds so accuracy can't silently regress.
+
+Current result: **precision 100%, recall 100%** (24/24, 0 FP, 0 FN). Building the
+benchmark drove a real fix — skipping comment-only lines eliminated a class of
+false positives. Documented limits (inline comments, string literals, regex-only
+outside Python) are stated in `benchmark/README.md`; closing them is what the
+AST/Tree-sitter future work in §7 is for.
+
 ## 3. Architecture
 
 ```
