@@ -63,11 +63,54 @@ def create_app(config_object: type = Config) -> Flask:
     def server_error(_e):
         return jsonify({"error": "Internal server error."}), 500
 
-    # Create tables on startup (dev convenience; use migrations in production).
+    # Create missing tables, then self-heal additive schema drift so existing
+    # deployments keep working (and keep their accounts) when the model gains
+    # columns — no manual migration or data wipe required.
     with app.app_context():
         db.create_all()
+        _ensure_user_columns()
 
     return app
+
+
+def _ensure_user_columns() -> None:
+    """Add any columns the User model expects but the live `users` table lacks.
+
+    db.create_all() never ALTERs existing tables, so when the model gains a
+    column an older database is missing it and every login/register 500s. This
+    adds the missing (additive, nullable/defaulted) columns in place, preserving
+    all existing rows. Safe to run on every boot.
+    """
+    import logging
+
+    from sqlalchemy import inspect, text
+
+    try:
+        insp = inspect(db.engine)
+        if "users" not in insp.get_table_names():
+            return
+        existing = {c["name"] for c in insp.get_columns("users")}
+        pg = db.engine.dialect.name == "postgresql"
+        ts = "TIMESTAMP WITH TIME ZONE" if pg else "TIMESTAMP"
+        true_, false_ = ("TRUE", "FALSE") if pg else ("1", "0")
+        wanted = {
+            "email_verified": f"BOOLEAN NOT NULL DEFAULT {false_}",
+            "verification_token": "VARCHAR(64)",
+            "api_key_hash": "VARCHAR(64)",
+            "api_key_prefix": "VARCHAR(32)",
+            "alert_on_high": f"BOOLEAN NOT NULL DEFAULT {true_}",
+            "terms_accepted_at": ts,
+        }
+        missing = {c: ddl for c, ddl in wanted.items() if c not in existing}
+        for col, ddl in missing.items():
+            db.session.execute(text(f"ALTER TABLE users ADD COLUMN {col} {ddl}"))
+        if missing:
+            db.session.commit()
+            logging.getLogger(__name__).info(
+                "Schema self-heal added user columns: %s", ", ".join(missing))
+    except Exception as exc:  # never let a heal attempt brick startup
+        db.session.rollback()
+        logging.getLogger(__name__).warning("Schema self-heal skipped: %s", exc)
 
 
 app = create_app()
