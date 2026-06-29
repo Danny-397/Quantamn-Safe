@@ -74,43 +74,61 @@ def create_app(config_object: type = Config) -> Flask:
 
 
 def _ensure_user_columns() -> None:
-    """Add any columns the User model expects but the live `users` table lacks.
+    """Reconcile the live `users` table with the current model — without data loss.
 
-    db.create_all() never ALTERs existing tables, so when the model gains a
-    column an older database is missing it and every login/register 500s. This
-    adds the missing (additive, nullable/defaulted) columns in place, preserving
-    all existing rows. Safe to run on every boot.
+    db.create_all() never ALTERs existing tables, so a database that predates a
+    model change keeps the old shape: missing newly-added columns (breaks SELECT)
+    and/or leftover obsolete columns that are NOT NULL (breaks INSERT). Both make
+    login/register 500. This adds the missing columns and drops the obsolete ones
+    in place, preserving all existing rows. Safe + idempotent on every boot.
     """
     import logging
 
     from sqlalchemy import inspect, text
 
+    log = logging.getLogger(__name__)
+    pg = db.engine.dialect.name == "postgresql"
+    ts = "TIMESTAMP WITH TIME ZONE" if pg else "TIMESTAMP"
+    true_, false_ = ("TRUE", "FALSE") if pg else ("1", "0")
+    wanted = {
+        "email_verified": f"BOOLEAN NOT NULL DEFAULT {false_}",
+        "verification_token": "VARCHAR(64)",
+        "api_key_hash": "VARCHAR(64)",
+        "api_key_prefix": "VARCHAR(32)",
+        "alert_on_high": f"BOOLEAN NOT NULL DEFAULT {true_}",
+        "terms_accepted_at": ts,
+    }
+    obsolete = ("plan", "stripe_customer_id")  # removed from the model
+
+    # 1) Add missing columns.
     try:
         insp = inspect(db.engine)
         if "users" not in insp.get_table_names():
             return
         existing = {c["name"] for c in insp.get_columns("users")}
-        pg = db.engine.dialect.name == "postgresql"
-        ts = "TIMESTAMP WITH TIME ZONE" if pg else "TIMESTAMP"
-        true_, false_ = ("TRUE", "FALSE") if pg else ("1", "0")
-        wanted = {
-            "email_verified": f"BOOLEAN NOT NULL DEFAULT {false_}",
-            "verification_token": "VARCHAR(64)",
-            "api_key_hash": "VARCHAR(64)",
-            "api_key_prefix": "VARCHAR(32)",
-            "alert_on_high": f"BOOLEAN NOT NULL DEFAULT {true_}",
-            "terms_accepted_at": ts,
-        }
         missing = {c: ddl for c, ddl in wanted.items() if c not in existing}
         for col, ddl in missing.items():
             db.session.execute(text(f"ALTER TABLE users ADD COLUMN {col} {ddl}"))
         if missing:
             db.session.commit()
-            logging.getLogger(__name__).info(
-                "Schema self-heal added user columns: %s", ", ".join(missing))
-    except Exception as exc:  # never let a heal attempt brick startup
+            log.info("Schema self-heal added columns: %s", ", ".join(missing))
+    except Exception as exc:
         db.session.rollback()
-        logging.getLogger(__name__).warning("Schema self-heal skipped: %s", exc)
+        log.warning("Schema self-heal (add) skipped: %s", exc)
+
+    # 2) Drop obsolete columns (kept separate so it can't undo step 1). A leftover
+    #    NOT NULL column with no default is what blocks new registrations.
+    try:
+        existing = {c["name"] for c in inspect(db.engine).get_columns("users")}
+        dropped = [c for c in obsolete if c in existing]
+        for col in dropped:
+            db.session.execute(text(f"ALTER TABLE users DROP COLUMN {col}"))
+        if dropped:
+            db.session.commit()
+            log.info("Schema self-heal dropped obsolete columns: %s", ", ".join(dropped))
+    except Exception as exc:
+        db.session.rollback()
+        log.warning("Schema self-heal (drop) skipped: %s", exc)
 
 
 app = create_app()
