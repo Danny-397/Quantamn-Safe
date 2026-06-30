@@ -537,7 +537,7 @@
       data: {
         labels,
         datasets: [{
-          data, borderColor: "#34d6ff", backgroundColor: "rgba(52,214,255,.12)",
+          data, borderColor: "#5b73e8", backgroundColor: "rgba(91,115,232,.12)",
           fill: true, tension: 0.25, pointRadius: 2, borderWidth: 2,
         }],
       },

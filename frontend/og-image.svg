@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#070912"/>
-  <rect x="0" y="0" width="1200" height="6" fill="#34d6ff"/>
+  <rect width="1200" height="630" fill="#0d1117"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#5b73e8"/>
   <g font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
-    <text x="80" y="150" fill="#34d6ff" font-size="30" font-weight="700" letter-spacing="2">QUANTUMSAFE</text>
+    <text x="80" y="150" fill="#5b73e8" font-size="30" font-weight="700" letter-spacing="2">QUANTUMSAFE</text>
     <text x="80" y="270" fill="#E0E0E0" font-size="68" font-weight="800">Find your quantum</text>
     <text x="80" y="345" fill="#E0E0E0" font-size="68" font-weight="800">vulnerabilities first.</text>
     <text x="80" y="430" fill="#9a9aae" font-size="30">Scan code · score quantum risk · NIST-aligned migration plan</text>
