@@ -196,6 +196,19 @@ _SKIP_DIRS = {
 
 _MAX_FILE_BYTES = 2_000_000  # skip very large/minified files
 
+# Minified / bundled assets are machine-generated, not first-party source. A
+# "crypto" match inside a packed line is almost always a false positive (e.g. the
+# substring "rc4"/"sha1" inside a minified library), so we skip them. Detected by
+# name OR by a single absurdly long line (only minified/generated code does that).
+_MINIFIED_RE = re.compile(r"(?:[.\-]min)\.(?:js|mjs|cjs)$|\.bundle\.js$", re.IGNORECASE)
+_MINIFIED_MAX_LINE = 2000
+
+
+def _looks_minified(name: str, lines: list[str]) -> bool:
+    if _MINIFIED_RE.search(name):
+        return True
+    return any(len(ln) > _MINIFIED_MAX_LINE for ln in lines)
+
 
 # --------------------------------------------------------------------------- #
 # AST engine (Python only)
@@ -341,6 +354,8 @@ def scan_file(abs_path: str, rel_path: str) -> list[Finding]:
         return []
 
     lines = source.splitlines()
+    if _looks_minified(os.path.basename(abs_path), lines):
+        return []
     findings = _regex_scan(lines, lang, rel_path)
     if lang == "python":
         findings += _ast_scan_python(source, rel_path, lines)

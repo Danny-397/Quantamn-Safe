@@ -66,6 +66,19 @@ def test_clean_code_has_no_findings(tmp_path):
     assert scan_path(str(tmp_path)) == []
 
 
+def test_minified_files_are_skipped(tmp_path):
+    # Same matching content: the normal file is flagged, the minified ones are not
+    # (machine-generated bundles are skipped to avoid false positives).
+    snippet = "const k = crypto.createCipheriv('rc4', key, iv);\n"
+    _write(tmp_path, "net.js", snippet)              # detected
+    _write(tmp_path, "net.min.js", snippet)          # skipped by name
+    _write(tmp_path, "vendor-min.js", snippet)       # skipped by name
+    _write(tmp_path, "app.bundle.js", snippet)       # skipped by name
+    _write(tmp_path, "packed.js", "x();" + "a" * 2100 + snippet)  # skipped: huge line
+    files = {f.file_path for f in scan_path(str(tmp_path))}
+    assert files == {"net.js"}, f"expected only net.js, got {files}"
+
+
 def test_low_risk_classification(tmp_path):
     _write(tmp_path, "s.py", "import hashlib\nh = hashlib.sha256(b'x')\n")
     findings = scan_path(str(tmp_path))
