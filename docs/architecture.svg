@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="660" viewBox="0 0 1040 660" font-family="'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="qsg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d6ff"/>
+      <stop offset="1" stop-color="#9d7bff"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6b80"/>
+    </marker>
+    <marker id="arrowc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34d6ff"/>
+    </marker>
+    <style>
+      .box{fill:#0e1426;stroke:#27324d;stroke-width:1.5;rx:10}
+      .lbl{fill:#e8eefc;font-size:15px;font-weight:600}
+      .sub{fill:#8aa0c4;font-size:11.5px}
+      .grp{fill:#34d6ff;font-size:12px;font-weight:700;letter-spacing:.08em}
+      .edge{stroke:#5b6b80;stroke-width:1.6;fill:none}
+      .edgec{stroke:#34d6ff;stroke-width:1.8;fill:none}
+      .mono{font-family:'JetBrains Mono',Consolas,monospace}
+    </style>
+  </defs>
+
+  <rect width="1040" height="660" fill="#070912"/>
+  <text x="40" y="46" fill="url(#qsg)" font-size="24" font-weight="800">QuantumSafe — System Architecture</text>
+  <text x="40" y="70" class="sub" font-size="13">Attack ➜ Detection ➜ Fix · one shared detection engine behind three surfaces</text>
+
+  <!-- ENTRY POINTS -->
+  <text x="40" y="112" class="grp">ENTRY POINTS</text>
+  <rect class="box" x="40" y="126" width="180" height="58" rx="10"/>
+  <text x="56" y="152" class="lbl">CLI</text>
+  <text x="56" y="170" class="sub mono">pip install quantumsafe</text>
+
+  <rect class="box" x="40" y="206" width="180" height="58" rx="10"/>
+  <text x="56" y="232" class="lbl">Web dashboard</text>
+  <text x="56" y="250" class="sub">static site · vanilla JS</text>
+
+  <rect class="box" x="40" y="286" width="180" height="58" rx="10"/>
+  <text x="56" y="312" class="lbl">REST API</text>
+  <text x="56" y="330" class="sub">Flask · JWT · API keys</text>
+
+  <!-- SHARED ENGINE -->
+  <text x="300" y="112" class="grp">SHARED DETECTION ENGINE · cli/ (package: quantumsafe)</text>
+  <rect x="300" y="126" width="500" height="218" rx="12" fill="#0b1120" stroke="url(#qsg)" stroke-width="1.8"/>
+
+  <rect class="box" x="322" y="150" width="200" height="52" rx="9"/>
+  <text x="338" y="173" class="lbl">scanner</text>
+  <text x="338" y="191" class="sub">AST (Python) + regex · 11 langs</text>
+
+  <rect class="box" x="578" y="150" width="200" height="52" rx="9"/>
+  <text x="594" y="173" class="lbl">scorer</text>
+  <text x="594" y="191" class="sub">0–100 risk + band</text>
+
+  <rect class="box" x="322" y="224" width="200" height="52" rx="9"/>
+  <text x="338" y="247" class="lbl">recommender</text>
+  <text x="338" y="265" class="sub">NIST / FIPS mapping</text>
+
+  <rect class="box" x="578" y="224" width="200" height="52" rx="9"/>
+  <text x="594" y="247" class="lbl">reporter</text>
+  <text x="594" y="265" class="sub">json·html·sarif·cbom·svg</text>
+
+  <rect class="box" x="430" y="296" width="240" height="38" rx="9"/>
+  <text x="450" y="320" class="lbl" font-size="13">Findings <tspan class="sub">(file · line · family · severity)</tspan></text>
+
+  <!-- engine internal arrows -->
+  <path class="edgec" d="M522 176 H578" marker-end="url(#arrowc)"/>
+  <path class="edgec" d="M678 202 V224" marker-end="url(#arrowc)"/>
+  <path class="edgec" d="M578 250 H522" marker-end="url(#arrowc)"/>
+  <path class="edgec" d="M422 276 V296" marker-end="url(#arrowc)"/>
+
+  <!-- entry -> engine -->
+  <path class="edge" d="M220 155 C260 155 262 168 300 172" marker-end="url(#arrow)"/>
+  <path class="edge" d="M220 235 H300" marker-end="url(#arrow)"/>
+  <path class="edge" d="M220 315 C262 315 262 188 300 184" marker-end="url(#arrow)"/>
+
+  <!-- OUTPUT / DB -->
+  <text x="858" y="112" class="grp">OUTPUT</text>
+  <rect class="box" x="858" y="126" width="150" height="76" rx="10"/>
+  <text x="874" y="152" class="lbl">Reports</text>
+  <text x="874" y="172" class="sub">JSON · HTML</text>
+  <text x="874" y="188" class="sub">SARIF · CBOM · SVG</text>
+
+  <rect class="box" x="858" y="224" width="150" height="76" rx="10"/>
+  <text x="874" y="250" class="lbl">Database</text>
+  <text x="874" y="270" class="sub">users · scans</text>
+  <text x="874" y="286" class="sub">findings (SQLite/PG)</text>
+
+  <path class="edge" d="M800 250 H858" marker-end="url(#arrow)"/>
+  <path class="edge" d="M670 315 C760 315 800 200 858 180" marker-end="url(#arrow)"/>
+
+  <!-- COMPANION MODULES -->
+  <text x="40" y="420" class="grp">RUNNABLE COMPANIONS · justify the ratings &amp; implement the fix (not on the request path)</text>
+
+  <rect class="box" x="40" y="436" width="470" height="150" rx="12"/>
+  <text x="60" y="464" class="lbl">quantum/ — the attack <tspan class="sub">“why is it vulnerable?”</tspan></text>
+  <rect x="60" y="480" width="200" height="40" rx="8" fill="#141c30" stroke="#27324d"/>
+  <text x="74" y="505" class="sub mono">shor.py — breaks RSA / ECC</text>
+  <rect x="276" y="480" width="214" height="40" rx="8" fill="#141c30" stroke="#27324d"/>
+  <text x="290" y="505" class="sub mono">grover.py — halves symmetric</text>
+  <rect x="60" y="528" width="430" height="40" rx="8" fill="#141c30" stroke="#27324d"/>
+  <text x="74" y="553" class="sub mono">resources.py — qubit / depth / gate cost vs RSA-2048</text>
+
+  <rect class="box" x="530" y="436" width="470" height="150" rx="12"/>
+  <text x="550" y="464" class="lbl">pqc/ — the fix <tspan class="sub">“what do I replace it with?”</tspan></text>
+  <rect x="550" y="480" width="200" height="40" rx="8" fill="#141c30" stroke="#27324d"/>
+  <text x="564" y="505" class="sub mono">lwe_kem.py — quantum-safe KEM</text>
+  <rect x="766" y="480" width="214" height="40" rx="8" fill="#141c30" stroke="#27324d"/>
+  <text x="780" y="505" class="sub mono">benchmark.py — sizes vs ML-KEM</text>
+  <rect x="550" y="528" width="430" height="40" rx="8" fill="#141c30" stroke="#27324d"/>
+  <text x="564" y="553" class="sub mono">LWE — the math behind CRYSTALS-Kyber / ML-KEM (FIPS 203)</text>
+
+  <!-- engine -> companions -->
+  <path class="edge" d="M430 344 C300 380 220 400 200 436" marker-end="url(#arrow)"/>
+  <path class="edge" d="M620 344 C700 390 740 410 760 436" marker-end="url(#arrow)"/>
+
+  <!-- deployment footer -->
+  <rect x="40" y="606" width="960" height="34" rx="8" fill="#0b1120" stroke="#27324d"/>
+  <text x="58" y="628" class="sub mono">Deploy:  Vercel (frontend) ──HTTPS/CORS──▶ Render (Flask API) ──▶ Render Postgres      ·      PyPI: quantumsafe CLI ──sync──▶ /api/v1/scan/import</text>
+</svg>
