@@ -21,6 +21,6 @@ python benchmark/graphs/generate_graphs.py
 ![Scan time vs size](scan_time_vs_size.png)
 
 > The bar/pie counts are **raw scanner findings** (per matched line), so the total
-> can exceed the 24 labeled `(file, family)` pairs reported in
+> can exceed the 26 labeled `(file, family)` pairs reported in
 > [../RESULTS.md](../RESULTS.md) — both are correct, they just count at different
 > granularity. The line chart's timings depend on your host.

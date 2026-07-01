@@ -146,22 +146,25 @@ score = min(100, 15*HIGH + 5*MEDIUM + 1*LOW)
 
 ## Evaluation (does the detector actually work?)
 
-The scanner is measured against a labeled [benchmark](benchmark/) of 12 files
-across 9 languages, including decoys (crypto names in comments, word-boundary
-traps like `md5sumLabel`) designed to trip a naive matcher:
+The scanner is measured against a labeled [benchmark](benchmark/) of 15 files
+across 9 languages, including adversarial decoys (crypto names in comments,
+docstrings, log strings, and word-boundary traps like `md5sumLabel`) designed to
+trip a naive matcher. `evaluate.py` runs the scanner twice — a naive line-regex
+baseline vs. the string/comment-aware engine — so the improvement is measured:
 
 ```bash
 python benchmark/evaluate.py
 ```
 
-| Metric | Value |
-|--------|-------|
-| Labeled findings | 24 |
-| Precision | 100% |
-| Recall | 100% |
+| Configuration | FP | Precision | Recall | F1 |
+|---|--:|--:|--:|--:|
+| Naive line-regex baseline | 14 | 65.0% | 100% | 78.8% |
+| **QuantumSafe (usage-aware)** | **0** | **100%** | **100%** | **100%** |
 
-`evaluate.py` prints the exact false positives/negatives so the numbers are
-auditable, and the thresholds are enforced by `tests/test_benchmark.py`. Honest
+Usage-awareness removes 14 false positives (keywords inside docstrings/log strings)
+without losing a true positive. `evaluate.py` prints the exact false
+positives/negatives so the numbers are auditable, and the thresholds are enforced
+by `tests/test_benchmark.py`. Honest
 limits are documented in [benchmark/README.md](benchmark/README.md) and
 [benchmark/RESULTS.md](benchmark/RESULTS.md) — this is a regression benchmark, not
 a claim of perfection on arbitrary code.
@@ -343,6 +346,10 @@ all of their data.
 ---
 
 ## Dashboard
+
+| Overview | Findings | Migration plan |
+|---|---|---|
+| ![Overview](docs/screenshots/overview.png) | ![Findings](docs/screenshots/findings.png) | ![Migration plan](docs/screenshots/migration-plan.png) |
 
 A static site (`frontend/`) — no build step. Pages:
 

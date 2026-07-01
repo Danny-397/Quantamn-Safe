@@ -15,38 +15,41 @@ python benchmark/evaluate.py
 - **Ground truth** (`labels.json`) is defined at **(file, detection-family)**
   granularity by hand.
 - `benchmark/positive/` contains known-vulnerable code; `benchmark/negative/`
-  contains safe code and **decoys** designed to trip a naive matcher:
-  crypto names that appear only in **comments**, and **word-boundary traps**
-  (`md5sumLabel`, `rc4legacyName`, `dsaCount`) that must *not* match.
-- `evaluate.py` runs the real scanner, compares detected vs. expected pairs, and
-  reports precision / recall / F1 **plus the exact false positives and false
-  negatives**, so the numbers are auditable.
+  contains safe code and **decoys** designed to trip a naive matcher: crypto names
+  that appear only in **comments, docstrings, log messages, and exception
+  strings**, and **word-boundary traps** (`md5sumLabel`, `rc4legacyName`,
+  `dsaCount`) that must *not* match.
+- `evaluate.py` runs the real scanner **twice** — once as a naive line-level regex
+  and once with the string/comment-aware pass — compares detected vs. expected
+  pairs, and reports precision / recall / F1 **plus the exact false positives and
+  false negatives**, so the numbers are auditable and the improvement is measured.
 
 ## Results (current)
 
-| Metric | Value |
-|--------|-------|
-| Files | 12 (9 positive, 3 negative/decoy) across 9 languages |
-| Labeled findings | 24 |
-| True positives | 24 |
-| False positives | 0 |
-| False negatives | 0 |
-| **Precision** | **100%** |
-| **Recall** | **100%** |
+15 files (10 positive, 5 negative/decoy) across 9 languages, 26 labeled findings:
 
-The comment decoys produce zero false positives because the regex engine skips
-comment-only lines; the word-boundary traps are excluded by anchored patterns.
+| Configuration | TP | FP | FN | Precision | Recall | F1 |
+|---|--:|--:|--:|--:|--:|--:|
+| Naive line-regex baseline | 26 | 14 | 0 | 65.0% | 100% | 78.8% |
+| **QuantumSafe (usage-aware)** | **26** | **0** | **0** | **100%** | **100%** | **100%** |
+
+The string/comment-aware pass removes **14 false positives** (keyword mentions
+inside Python docstrings, log strings, and exception messages) without losing a
+true positive. Comment-only mentions and word-boundary traps are handled by the
+comment filter and anchored patterns.
 
 ## Honest limitations (what this benchmark does *not* prove)
 
 This is a focused regression benchmark, not a large-scale field study. Real-world
 caveats, stated plainly:
 
-- **Small scale:** 12 files / 24 findings. It guards against regressions and
+- **Small scale:** 15 files / 26 findings. It guards against regressions and
   demonstrates the approach; it is not a claim of 100% accuracy on arbitrary code.
-- **Inline comments & string literals:** the scanner skips *comment-only* lines,
-  but a crypto name in a *trailing* comment (`x = 1  # drop RSA`) or inside a
-  string can still be a false positive. Block comments are only partially handled.
+- **String/comment awareness is Python-only:** Python masks string, docstring, and
+  comment content (via `tokenize`) before the regex pass, so trailing comments and
+  keywords-in-strings no longer false-positive there. Other languages still rely on
+  the comment-line filter, so a crypto name inside a *string literal* in JS/Java/etc.
+  can still be a false positive.
 - **Regex outside Python:** only Python gets AST precision; other languages are
   regex-based, so unusual crypto wrappers can be missed (false negatives).
 

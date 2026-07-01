@@ -8,7 +8,10 @@
   "positive/mac.swift": ["md5", "sha256"],
   "positive/sign.rs": ["rsa", "sha1"],
   "positive/digest.rb": ["rsa", "md5"],
+  "positive/mixed.py": ["dsa", "sha1"],
   "negative/safe.py": [],
   "negative/comments.js": [],
-  "negative/decoys.go": []
+  "negative/decoys.go": [],
+  "negative/logs.py": [],
+  "negative/docs.py": []
 }

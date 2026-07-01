@@ -22,27 +22,31 @@ detects `D`:
   much was caught.
 - **F1** = harmonic mean of precision and recall (a single combined figure).
 
-| Metric            | Value                              |
-|-------------------|------------------------------------|
-| Files             | 12 (9 positive, 3 negative/decoy)  |
-| Languages         | 9 (engine supports 11)             |
-| Labeled findings  | 24                                 |
-| True positives    | 24                                 |
-| False positives   | 0                                  |
-| False negatives   | 0                                  |
-| **Precision**     | **100%**                           |
-| **Recall**        | **100%**                           |
-| **F1**            | **100%**                           |
+The corpus (**15 files, 9 languages, 26 labeled findings**) includes adversarial
+**decoys**: crypto names inside comments, docstrings, log messages, and exception
+strings, plus word-boundary traps (`md5sumLabel`, `rc4legacyName`, `dsaCount`).
+`evaluate.py` runs the scanner **twice** — once as a naive line-level regex, once
+with QuantumSafe's string/comment-aware pass — so the effect is measured, not
+asserted:
 
-The zero false-positive result holds despite deliberate decoys: crypto names that
-appear only in comments (skipped, comment-only lines), and word-boundary traps
-(`md5sumLabel`, `rc4legacyName`, `dsaCount`) excluded by anchored patterns.
+| Configuration | TP | FP | FN | Precision | Recall | F1 |
+|---|--:|--:|--:|--:|--:|--:|
+| Naive line-regex baseline | 26 | 14 | 0 | 65.0% | 100% | 78.8% |
+| **QuantumSafe (usage-aware)** | **26** | **0** | **0** | **100%** | **100%** | **100%** |
+
+The usage-aware pass removes **14 false positives** — every one a keyword mention
+inside a Python docstring, log string, or exception message — **without losing a
+single true positive**, so recall stays 100%. The `positive/mixed.py` case is the
+clearest: real `dsa.generate_private_key(...)` and `hashlib.sha1(...)` usage is
+still caught, while the `RSA`/`MD5` that appear only in its docstring and a log
+string are correctly ignored. Comment-only mentions and word-boundary traps are
+handled by the comment filter and anchored patterns as before.
 
 ---
 
 ## Risk distribution (labeled findings)
 
-Derived from `labels.json` (24 findings across the positive corpus).
+Derived from `labels.json` (26 findings across the positive corpus).
 
 ### By crypto family
 
@@ -51,9 +55,9 @@ Derived from `labels.json` (24 findings across the positive corpus).
 | RSA    | 6 | HIGH |
 | MD5    | 5 | HIGH |
 | SHA-256| 3 | LOW |
+| SHA-1  | 3 | HIGH |
 | ECC    | 2 | HIGH |
-| SHA-1  | 2 | HIGH |
-| DSA    | 1 | HIGH |
+| DSA    | 2 | HIGH |
 | DH     | 1 | HIGH |
 | 3DES   | 1 | MEDIUM |
 | RC4    | 1 | MEDIUM |
@@ -64,9 +68,9 @@ Derived from `labels.json` (24 findings across the positive corpus).
 
 | Severity | Findings | Share |
 |----------|---------:|------:|
-| HIGH     | 17 | 71% |
+| HIGH     | 19 | 73% |
 | MEDIUM   | 3  | 12% |
-| LOW      | 4  | 17% |
+| LOW      | 4  | 15% |
 
 (HIGH = `rsa, ecc, dsa, dh, md5, sha1`; MEDIUM = `tls_old, 3des, rc4`;
 LOW = `sha256, aes128`.)
@@ -107,7 +111,10 @@ dependency-light.
 
 ## Honest framing
 
-This is a **regression benchmark**, not a large-scale field study. 100% on 24
-findings demonstrates the approach and guards against regressions; it is not a
-claim of perfect accuracy on arbitrary code. See [README.md](README.md) and
+This is a **regression benchmark**, not a large-scale field study. 100% on 26
+findings across 15 files demonstrates the approach and guards against regressions;
+it is **not** a claim of perfect accuracy on arbitrary code. The point of the
+naive-vs-improved comparison is to quantify a specific, real improvement (string /
+comment awareness) honestly — including that the naive approach's recall is already
+100% here, so the win is precision, not coverage. See [README.md](README.md) and
 [../TECHNICAL_OVERVIEW.md](../TECHNICAL_OVERVIEW.md) for the limitations.
