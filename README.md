@@ -181,6 +181,32 @@ These charts are generated from **live scanner output** by
 **See real scan output** — terminal table, JSON, SARIF, HTML, and an SVG risk
 badge from an actual scan — in [docs/EXAMPLES.md](docs/EXAMPLES.md).
 
+### Real-world scan: paramiko (the SSH library)
+
+Run against a shallow clone of [`paramiko/paramiko`](https://github.com/paramiko/paramiko)
+— the SSH implementation behind Ansible, Fabric, and much of the Python ecosystem.
+SSH key exchange leans on RSA, ECDSA, and Diffie-Hellman, all broken by Shor's
+algorithm, which makes it a textbook "harvest now, decrypt later" target:
+
+```bash
+quantumsafe scan --repo https://github.com/paramiko/paramiko
+```
+
+| Metric | Result |
+|---|---|
+| Quantum Risk Score | **100 / 100 (Critical)** |
+| Findings (usage-aware) | **110** — 89 HIGH, 6 MEDIUM, 15 LOW |
+| Top algorithms | ECDSA ×23, ECC ×21, SHA-1 ×18, RSA ×15, MD5 ×10, 3DES ×6 |
+| Most-affected files | `paramiko/pkey.py`, `rsakey.py`, `transport.py`, `ecdsakey.py` |
+
+The usage-aware engine matters here: a naive line-regex reports **451 raw
+matches**, but most are the same algorithms repeated in docstrings, comments, and
+SSH protocol-name strings (`"ssh-rsa"`, `"ecdsa-sha2-nistp256"`). Focusing on real
+code brings that to **110** findings — a ~4× noise reduction. *Honest caveat: on a
+protocol library, a few of those suppressed string constants are arguably real
+signals, so 110 is a deliberately conservative, code-focused count — not a claim
+that the other 341 were all false positives.*
+
 ### Empirical study — how widespread is the problem?
 
 Scanning 8 widely-used open-source projects ([`study/`](study/), reproducible via
