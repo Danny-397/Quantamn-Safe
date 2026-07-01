@@ -375,6 +375,9 @@ all of their data.
 
 ## Dashboard
 
+The dashboard, showing a **real scan of [paramiko](https://github.com/paramiko/paramiko)**
+(100/100 Critical, 110 findings):
+
 | Overview | Findings | Migration plan |
 |---|---|---|
 | ![Overview](docs/screenshots/overview.png) | ![Findings](docs/screenshots/findings.png) | ![Migration plan](docs/screenshots/migration-plan.png) |
