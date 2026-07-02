@@ -3,7 +3,7 @@ description: "Scan a codebase for quantum-vulnerable cryptography and upload SAR
 author: "QuantumSafe"
 branding:
   icon: "shield"
-  color: "green"
+  color: "blue"
 
 inputs:
   path:
@@ -32,7 +32,6 @@ runs:
 
     - name: Install QuantumSafe
       shell: bash
-      # Once published: pip install quantumsafe-scan
       run: pip install quantumsafe-scan
 
     - name: Run QuantumSafe scan
